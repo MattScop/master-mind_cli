@@ -11,13 +11,38 @@
 class Table < Array
     @@colors = ["\e[41m \e[0m", "\e[42m \e[0m", "\e[43m \e[0m", "\e[44m \e[0m", "\e[45m \e[0m", "\e[46m \e[0m", "\e[100m \e[0m", "\e[107m \e[0m"]
     
-    attr_accessor :player_one, :player_two, :rows
+    attr_accessor :player_one, :player_two, :code_table, :rows
     
     def initialize(row_number, cell_number, default_value)
         super(row_number){Array.new(cell_number, default_value)}
         @player_one = ""
         @player_two = ""
+        @code_table = %w(O O O O)
         @rows = "" # used to print colours with puts command in CLI
+    end
+
+    def show_code_table
+        @code_table.each do |item|
+            @rows << "  #{item}"
+        end
+        puts @rows
+        @rows = ""
+    end
+
+    def show_available_colors
+        i = 0
+        j = 0
+        while j <= @@colors.length-3 do
+            numbered_color = @@colors[j].gsub(' ', " #{i} ")
+            @rows << "  #{numbered_color}"
+            if j >= 5
+                break
+            end
+            i += 1
+            j += 1
+        end
+        puts @rows
+        @rows = ""
     end
 
     def play 
@@ -69,6 +94,13 @@ class Table < Array
         else
             puts "The Master Mind is #{@player_two}!\n\nGood luck #{@player_one}"
         end
+        puts "\nPRESS #{"\e[5m1\e[0m"} TO CONTINUE"
+        continue_game_input = gets.chomp
+        until continue_game_input == "1" do
+            puts "\nPRESS #{"\e[5m1\e[0m"} TO CONTINUE"
+            continue_game_input = gets.chomp
+        end
+        system "clear"
         master_mind
 
         i = 0
@@ -98,9 +130,13 @@ class Table < Array
     end
 
     def master_mind
+        puts "Go Ahead MasterMind, Create Your Unbreakable Code Away From Prying Eyes\n"
+        show_code_table
+        puts "\nColors you can choose:"
+        show_available_colors
+        
         
     end
-    puts @rows
 end
 
 master_mind_table = Table.new(10, 4, "O")
