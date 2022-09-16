@@ -11,10 +11,10 @@
 class Table < Array
     @@colors = ["\e[41m \e[0m", "\e[42m \e[0m", "\e[43m \e[0m", "\e[44m \e[0m", "\e[45m \e[0m", "\e[46m \e[0m", "\e[100m \e[0m", "\e[107m \e[0m"]
     
-    attr_accessor :player_one, :player_two
+    attr_accessor :player_one, :player_two, :rows
     
-    def initialize(default, numbers, value)
-        super(default){Array.new(numbers, value)}
+    def initialize(row_number, cell_number, default_value)
+        super(row_number){Array.new(cell_number, default_value)}
         @player_one = ""
         @player_two = ""
         @rows = "" # used to print colours with puts command in CLI
@@ -34,12 +34,11 @@ class Table < Array
 
     # Choose to play vs AI / Human
     def player_choice 
-        system "clear"
+        system "clear" # Clear the CLI for better readability
         puts "Play...\n\n#{"\e[5m1\e[0m"}) vs AI\n#{"\e[5m2\e[0m"}) vs Player"
         play_against_input = gets.chomp
         until play_against_input == "1" || play_against_input == "2"
             player_choice
-            redo
         end
         if play_against_input == '1'
             game_starting
@@ -52,7 +51,7 @@ class Table < Array
 
     def game_starting
         puts "Game starting#{"\e[5m...\e[0m"}"
-        system "sleep 2; clear"
+        system "sleep 1.5; clear"
         puts "Insert Player One Name"
         @player_one = gets.chomp
     end
@@ -61,7 +60,17 @@ class Table < Array
         puts "Insert Player Two Name"
         @player_two = gets.chomp
 
-        puts player_one
+        # Codebreaker and mastermind selection
+        puts "\nWho is going to be the Master Mind?\nShuffling Odds\e[5m...\e[0m"
+        system "sleep 3; clear"
+        who_is_mastermind = [@player_one, @player_two].sample
+        if who_is_mastermind == @player_one
+            puts "The Master Mind is #{@player_one}!\n\nGood luck #{@player_two}"
+        else
+            puts "The Master Mind is #{@player_two}!\n\nGood luck #{@player_one}"
+        end
+        master_mind
+
         i = 0
         color_number = 1
         4.times do
@@ -88,29 +97,11 @@ class Table < Array
         @player_two = 'AI'
     end
 
-    def code_maker
-        i = 0
-        color_number = 1
-        4.times do
-            puts "Choose color # #{color_number}"
-            color = gets.chomp.to_i
-            puts 'Choose the position'
-            cell = gets.chomp.to_i
-            self[i][cell] = @@colors[color]
-            self.each do |column|
-                column.each_with_index do |item, idx|
-                    if idx == 3
-                        @rows = ""
-                    end
-                end
-            end
-            color_number += 1
-        end
-        i += 1
-        @rows << "  #{item}"
+    def master_mind
+        
     end
     puts @rows
 end
 
-master_mind = Table.new(10, 4, "O")
-master_mind.play
+master_mind_table = Table.new(10, 4, "O")
+master_mind_table.play
