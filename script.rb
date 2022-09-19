@@ -10,9 +10,8 @@
 
 class MasterMind < Array
     @@colors = ["\e[41m \e[0m", "\e[42m \e[0m", "\e[43m \e[0m", "\e[44m \e[0m", "\e[45m \e[0m", "\e[46m \e[0m", "\e[100m \e[0m", "\e[107m \e[0m"]
-    @@row_num = 0
     
-    attr_accessor :player_one, :player_two, :code_table, :rows, :pegs, :score_list
+    attr_accessor :player_one, :player_two, :code_table, :rows, :pegs, :score_list, :last_player, :row_num, :total_score
     
     def initialize(row_number, cell_number, default_value)
         super(row_number){Array.new(cell_number, default_value)}
@@ -22,10 +21,21 @@ class MasterMind < Array
         @rows = "" # used to print colours with puts command in CLI
         @pegs = []
         @score_list = {
-            master_mind_one: 0,
-            master_mind_two: 0,
-            last_player: ""
+            @player_one  => 0,
+            @player_two => 0,
         }
+        @last_player ""
+        @row_num = 0
+        @total_score = 0
+    end
+
+    def set_total_score
+        puts "\nSet the score total to reach"
+        @total_score = gets.chomp_to_i
+        until @total_score.class == Integer do
+            puts puts "\nSet the score total to reach"
+            @total_score = gets.chomp
+        end
     end
 
     def show_table
@@ -39,6 +49,15 @@ class MasterMind < Array
             end
         end
 
+        @rows = ""
+    end
+
+    def get_cell_number
+        example_table = %w(O O O O)
+        example_table.each_with_index do |item, idx|
+            @rows << "  #{"\e[2mcell#{idx} ->\e[0m " + item}"
+        end
+        puts @rows
         @rows = ""
     end
 
@@ -59,28 +78,33 @@ class MasterMind < Array
     end
 
     def add_colors_code_breaker
-        puts "It is your turn, Code Breaker\n"
+        puts "Your turn, Code Breaker, do your best!\n\n"
+        get_cell_number
+        puts "\nColors you can choose from:"
+        show_available_colors
         
         color_number = 1
         4.times do
             puts "\nChoose color # #{color_number}"
-            show_available_colors
             color = gets.chomp.to_i
             puts 'Choose the cell'
             cell = gets.chomp.to_i
-            self[@@row_num][cell] = @@colors[color]
-            self.each do |column|
-                column.each_with_index do |item, idx|
-                    @rows << "  #{item}"
-                    if idx == 3
-                        puts "#{@rows}\n--------------"
-                        @rows = ""
-                    end
-                end
+            if self[@row_num][cell] != "O"
+                puts "\e[91mCell is empty or is already filled, try again\e[0m"
+                redo
+            else
+                self[@row_num][cell] = @@colors[color]
             end
+            self[@row_num].each do |item|
+                    @rows << "  #{item}"
+            end
+                    
             color_number += 1
+            puts @rows
+            @rows = ""
         end
-        @rows = ""
+        puts "Checking the score#{"\e5m...\e[0m"}"
+        system "sleep 1.5; clear"
         check_round
     end
 
@@ -93,7 +117,12 @@ class MasterMind < Array
             color = gets.chomp.to_i
             puts 'Choose the cell'
             cell = gets.chomp.to_i
-            @code_table[cell] = @@colors[color]
+            if @code_table[cell] != "O"
+                puts "\e[91mCell is empty or is already filled, try again\e[0m"
+                redo
+            else
+                @code_table[cell] = @@colors[color]
+            end
             @code_table.each do |item|
                 @rows << "  #{item}"
             end
@@ -128,6 +157,7 @@ class MasterMind < Array
             puts "\nPRESS #{"\e[5m1\e[0m"} TO START THE GAME"
             start_game_input = gets.chomp
         end
+        set_total_score
         player_choice
     end
 
@@ -191,7 +221,7 @@ class MasterMind < Array
     end
 
     def check_round
-        self[@@row_num].each_with_index do |item, idx|
+        self[@row_num].each_with_index do |item, idx|
             if code_table.include?(item) 
                 if item == code_table[idx]
                     @pegs << "\e[100m \e[0m"
@@ -201,39 +231,80 @@ class MasterMind < Array
             end
         end
         
-        @pegs.each {|peg| puts "\n#{peg}"}
+        @pegs.each do |peg|
+            @rows << "  #{peg}"
+        end
+        puts "MasterMind feedback:\n#{@rows}"
+        @rows = ""
+
         won = pegs.all? { |item| item == "\e[100m \e[0m" }
         if won
-            puts "Code Breaker won"
-            if @score_list[:last_player] == "master_mind_one"
-                score_list[:master_mind_two] += (10 - @@row_num)
-                @score_list[:last_player] = "master_mind_two"
+            puts "\n#{"\e[92mCodeBreaker won\e[0m"}"
+            if @last_player == "player_one"
+                score_list[@player_two] += (10 - @row_num)
+                @last_player = "player_two"
             else
-                score_list[:master_mind_one] += (10 - @@row_num)
-                @score_list[:last_player] = "master_mind_one"
+                score_list[@player_one] += (10 - @row_num)
+                @last_player = "player_one"
             end
 
-            @@row_num = 0
+            @row_num = 0
             @code_table = %w(O O O O)
+            puts "\nSCORES"
+            score_list.each {|key, value| puts key, value}
+            puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
+            next_round_game_input = gets.chomp
+            until next_round_game_input == "1" do
+                puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
+                next_round_game_input = gets.chomp
+            end
+            puts "\nSwitching Roles#{"\e[5m...\e[0m"}"
+            system "sleep 1.5; clear"
             master_mind
         end
 
-        if @@row_num == 10 && !won
-            if @score_list[:last_player] == "master_mind_one"
-                score_list[:master_mind_two] += 11
-                @score_list[:last_player] = "master_mind_two"
+        if @row_num == 10 && !won
+            puts "\n#{"\e[92mMasterMind won\e[0m"}"
+            if @last_player == "player_one"
+                score_list[@player_two] += 11
+                @last_player = "player_two"
             else
-                score_list[:master_mind_one] += 11
-                @score_list[:last_player] = "master_mind_one"
+                score_list[:player_one] += 11
+                @last_player = "player_one"
             end
 
-            @@row_num = 0
+            @row_num = 0
             @code_table = %w(O O O O)
+            puts "\nSCORES"
+            score_list.each {|key, value| puts key, value}
+            puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
+            next_round_game_input = gets.chomp
+            until next_round_game_input == "1" do
+                puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
+                next_round_game_input = gets.chomp
+            end
+            puts "\nSwitching Roles#{"\e[5m...\e[0m"}"
+            system "sleep 1.5; clear"
             master_mind
         end
 
-        @@row_num += 1
+        @row_num += 1
+        puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
+        next_round_game_input = gets.chomp
+        until next_round_game_input == "1" do
+            puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
+            next_round_game_input = gets.chomp
+        end
+        system "clear"
         add_colors_code_breaker
+    end
+
+    def check_score
+        if score_list[@player_one] >= @total_score
+            puts @player_one + " won"
+        elsif score_list[@player_two] >= @total_score
+            puts @player_two + " won"
+        end
     end
 
     private
