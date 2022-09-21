@@ -11,7 +11,7 @@
 class MasterMind < Array
     @@colors = ["\e[41m \e[0m", "\e[42m \e[0m", "\e[43m \e[0m", "\e[44m \e[0m", "\e[45m \e[0m", "\e[46m \e[0m", "\e[100m \e[0m", "\e[107m \e[0m"]
     
-    attr_accessor :player_one, :player_two, :code_table, :rows, :pegs, :score_list, :last_player, :row_num, :total_score, :who_is_mastermind, :who_is_codebreaker, :temp_array_check_round, :temp_array_code
+    attr_accessor :player_one, :player_two, :code_table, :rows, :pegs, :score_list, :last_player, :row_num, :total_score, :who_is_mastermind, :who_is_codebreaker, :temp_array_check_round, :temp_array_code, :peg_array
     
     def initialize(row_number, cell_number, default_value)
         super(row_number){Array.new(cell_number, default_value)}
@@ -25,6 +25,7 @@ class MasterMind < Array
         @total_score = 0
         @who_is_mastermind = ""
         @who_is_codebreaker = ""
+        @peg_array = Array.new(10) {Array.new}
     end
 
     def set_total_score
@@ -38,12 +39,19 @@ class MasterMind < Array
     end
 
     def show_table
+        i = 0
+        peg_row = ""
         self.each do |column|
             column.each_with_index do |item, idx|
                 @rows << "  #{item}"
+                if @peg_array[idx] && i < @row_num
+                    peg_row << "  #{@peg_array[i][idx]}"
+                end
                 if idx == 3
-                    puts "#{@rows}\n--------------"
+                    puts "#{@rows}   #{peg_row}\n--------------"
                     @rows = ""
+                    peg_row = ""
+                    i += 1
                 end
             end
         end
@@ -77,7 +85,7 @@ class MasterMind < Array
     end
 
     def add_colors_code_breaker
-        puts "Your turn, #{@who_is_codebreaker}, do your best!\n\n"
+        puts "Try to break the code, #{@who_is_codebreaker}. Do your best!\n\n"
         get_cell_number
         puts "\nColors you can choose from:"
         show_available_colors
@@ -86,6 +94,10 @@ class MasterMind < Array
         4.times do
             puts "\nChoose color # #{color_number}"
             color = gets.chomp.to_i
+            if !@@colors[color]
+                puts "\e[91mColor doesn't exist, try again\e[0m"
+                redo
+            end
             puts 'Choose the cell'
             cell = gets.chomp.to_i
             if self[@row_num][cell] != "O"
@@ -103,6 +115,25 @@ class MasterMind < Array
             puts @rows
             @rows = ""
         end
+        system "clear"
+        puts "Your combination is"
+        self[@row_num].each_with_index do |item, idx|
+            @rows << "  #{"\e[2mcell#{idx} ->\e[0m " + item}"
+        end
+        puts @rows
+        @rows = ""
+        puts "\nPRESS #{"\e[5m1\e[0m"} TO CONFIRM OR #{"\e[5m2\e[0m"} TO CHANGE IT"
+        confirm_combination_input = gets.chomp
+        until confirm_combination_input == "1" || confirm_combination_input == "2"
+            puts "\nPRESS #{"\e[5m1\e[0m"} TO CONFIRM OR #{"\e[5m2\e[0m"} TO CHANGE IT"
+            confirm_combination_input = gets.chomp
+        end
+        if confirm_combination_input == '2'
+            self[@row_num] = %w(O O O O)
+            @temp_array_check_round = %w(O O O O)
+            system "clear"
+            add_colors_code_breaker
+        end
         puts "\nChecking the score#{"\e[5m...\e[0m"}"
         system "sleep 1.5; clear"
         check_round
@@ -115,6 +146,10 @@ class MasterMind < Array
         4.times do
             puts "\nChoose color # #{color_number}"
             color = gets.chomp.to_i
+            if !@@colors[color]
+                puts "\e[91mColor doesn't exist, try again\e[0m"
+                redo
+            end
             puts 'Choose the cell'
             cell = gets.chomp.to_i
             if @code_table[cell] != "O"
@@ -151,7 +186,7 @@ class MasterMind < Array
     def play
         # Game start
         system "clear"
-        greetings = "*************************\n* " + "\e[93mWELCOME TO MASTERMIND\e[0m" + " *\n*************************"
+        greetings = "*************************\n* " + "\e[93mWELCOME TO MASTERMIND\e[0m" + " *\n*************************\n\n#{"\e[1;4mMAKE THE TERMINAL WINDOW FULL SIZE\e[0m"}"
         puts greetings + "\n\nPRESS #{"\e[5m1\e[0m"} TO START THE GAME"
         start_game_input = gets.chomp
         until start_game_input == "1" do
@@ -228,18 +263,21 @@ class MasterMind < Array
     end
 
     def check_round
+        temp_code = temp_array_code.dup
         @temp_array_check_round.each_with_index do |item, idx|
-            if item == @temp_array_code[idx]
+            if item == temp_code[idx]
                 @pegs << "\e[100m \e[0m"
+                @peg_array[@row_num] << "\e[100m \e[0m"
                 @temp_array_check_round.delete_at(idx)
-                @temp_array_check_round.insert(idx, "O")
-                @temp_array_code.delete_at(idx)
-                @temp_array_code.insert(idx, "O")
+                @temp_array_check_round.insert(idx, 0)
+                temp_code.delete_at(idx)
+                temp_code.insert(idx, "0")
             end
         end
         @temp_array_check_round.each_with_index do |item, idx|
-            if @temp_array_code.include?(item) && item != @temp_array_check_round[idx]
+            if temp_code.include?(item) && temp_code[idx] != @temp_array_check_round[idx]
                 @pegs << "\e[107m \e[0m"
+                @peg_array[@row_num] << "\e[107m \e[0m"
                 # @temp_array_check_round.delete(item)
             end
         end
@@ -265,84 +303,110 @@ class MasterMind < Array
 
         won = pegs.all? { |item| item == "\e[100m \e[0m" } && pegs.length == 4
         if won
-            puts "\n#{"\e[92m#{@who_is_codebreaker} broke the code!\e[0m"}"
-            if @last_player == "player_one"
+            puts "\n#{"\e[92m#{@who_is_codebreaker} broke the code!\e[0m"}\n"
+            if @who_is_mastermind == @player_two
                 score_list[player_two] += @row_num
-                @last_player = "player_two"
             else
                 score_list[player_one] += @row_num
-                @last_player = "player_one"
             end
 
+            puts "\nMasterMind Code was:"
+            show_code_table
             @row_num = 0
+            @pegs = []
+            peg_array.each do |row|
+                row.replace([])
+            end
             @code_table = %w(O O O O)
+            self.each do |row|
+                row.replace(%w(O O O O))
+            end
             @temp_array_check_round = %w(O O O O)
-            puts "\n#{show_table}\n#{show_code_table}"
+            @temp_array_code = %w(O O O O)
             puts "\nSCORES"
             score_list.each {|key, value| puts key, value}
-            puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
-            next_round_game_input = gets.chomp
-            until next_round_game_input == "1" do
-                puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
-                next_round_game_input = gets.chomp
-            end
-            puts "\nSwitching Roles#{"\e[5m...\e[0m"}"
-            if @who_is_mastermind == @player_one
-                @who_is_mastermind = @player_two
-                @who_is_codebreaker = @player_one
-            elsif @who_is_mastermind == @player_two
-                @who_is_mastermind = @player_one
-                @who_is_codebreaker = @player_two
-            end
-            system "sleep 1.5; clear"
-            master_mind
-        end
-
-        if @row_num == 10 && !won
-            puts "\n#{"\e[92m#{@@who_is_mastermind}'code was unbreakable!\e[0m"}"
-            if @last_player == "player_one"
+            
+            check_score
+        elsif @row_num == 9 && !won
+            puts "\n#{"\e[92m#{@who_is_mastermind}'s code was unbreakable!\e[0m"}"
+            if @who_is_mastermind == @player_two
                 score_list[player_two] += 11
-                @last_player = "player_two"
             else
                 score_list[player_one] += 11
-                @last_player = "player_one"
             end
 
+            puts "\nMasterMind Code was:"
+            show_code_table
             @row_num = 0
+            @pegs = []
+            peg_array.each do |row|
+                row.replace([])
+            end
+            self.each do |row|
+                row.replace(%w(O O O O))
+            end
             @code_table = %w(O O O O)
             @temp_array_check_round = %w(O O O O)
-            puts "\n#{show_table}\n#{show_code_table}"
+            @temp_array_code = %w(O O O O)
+            # puts "\n#{show_table}\n#{show_code_table}"
             puts "\nSCORES"
             score_list.each {|key, value| puts key, value}
+            
+            check_score
+        else
+            @row_num += 1
+            @pegs = []
+            @temp_array_check_round = %w(O O O O)
             puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
             next_round_game_input = gets.chomp
             until next_round_game_input == "1" do
                 puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
                 next_round_game_input = gets.chomp
             end
-            puts "\nSwitching Roles#{"\e[5m...\e[0m"}"
-            system "sleep 1.5; clear"
-            master_mind
+            system "clear"
+            puts "ROUND # #{@row_num + 1}"
+            add_colors_code_breaker
         end
-
-        @row_num += 1
-        @pegs = []
-        @temp_array_check_round = %w(O O O O)
-        puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
-        next_round_game_input = gets.chomp
-        until next_round_game_input == "1" do
-            puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
-            next_round_game_input = gets.chomp
-        end
-        system "clear"
-        add_colors_code_breaker
     end
 
     def check_score
         if score_list[@player_one] >= @total_score
-            puts @player_one + " won"
+            puts "\n\n\e[7m#{@player_one.upcase} WON THE GAME\e[0m"
+            puts "\nPRESS #{"\e[5m1\e[0m"} TO PLAY ANOTHER GAME"
+            next_game_input = gets.chomp
+            until next_game_input == "1" do
+                puts "\nPRESS #{"\e[5m1\e[0m"} TO PLAY ANOTHER GAME"
+                next_game_input = gets.chomp
+            end
+            set_total_score
+            player_choice
         elsif score_list[@player_two] >= @total_score
-            puts @player_two + " won"
+            puts "\n\n\e[7m#{@player_two.upcase} WON THE GAME\e[0m"
+            puts "\nPRESS #{"\e[5m1\e[0m"} TO PLAY ANOTHER GAME"
+            next_game_input = gets.chomp
+            until next_game_input == "1" do
+                puts "\nPRESS #{"\e[5m1\e[0m"} TO PLAY ANOTHER GAME"
+                next_game_input = gets.chomp
+            end
+            set_total_score
+            player_choice
+        else
+            puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT GAME"
+                next_round_game_input = gets.chomp
+                until next_round_game_input == "1" do
+                    puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT GAME"
+                    next_round_game_input = gets.chomp
+                end
+                puts "\nSwitching Roles#{"\e[5m...\e[0m"}"
+                if @who_is_mastermind == @player_one
+                    @who_is_mastermind = @player_two
+                    @who_is_codebreaker = @player_one
+                elsif @who_is_mastermind == @player_two
+                    @who_is_mastermind = @player_one
+                    @who_is_codebreaker = @player_two
+                end
+                system "sleep 1.5; clear"
+            master_mind
         end
     end
 
