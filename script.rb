@@ -285,6 +285,7 @@ class MasterMind < Array
     end
 
     def ai_strategy
+        test branch
         total_black_pegs = @peg_array[@table_line_number - 1].select { |peg| peg == "\e[100m \e[0m" }
         total_white_pegs = @peg_array[@table_line_number - 1].select { |peg| peg == "\e[107m \e[0m" }
         total_pegs = total_black_pegs.length + total_white_pegs.length
