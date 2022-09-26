@@ -25,7 +25,14 @@ class MasterMind < Array
         @random_colors_ai = @@COLORS_AI.sample(2)
         @blacklist_colors_ai = [] # colors to be removed from ai choice options
         @yellowlist_colors_ai = [] # colors temporary removed from ai choice options
-        @idx_temp_removed_colors = {} # for ai. Storage for index of temporary removed colors
+        @excluded_idx_colors = {
+            "\e[41m \e[0m" => [],
+            "\e[42m \e[0m" => [],
+            "\e[43m \e[0m" => [],
+            "\e[44m \e[0m" => [],
+            "\e[45m \e[0m" => [],
+            "\e[46m \e[0m" => []
+        }
     end
 
     def play
@@ -67,7 +74,7 @@ class MasterMind < Array
         elsif play_against_input == '2'
             game_starting
             human_play
-        end 
+        end
     end
 
     def game_starting
@@ -158,7 +165,7 @@ class MasterMind < Array
             @master_mind_code_table[i] = @@COLORS_AI.sample
             i += 1
         end
-        puts "AI Generated the Code\n\n"
+        puts "AI Generated the Code\n"
         add_colors_code_breaker
     end
 
@@ -217,7 +224,7 @@ class MasterMind < Array
         # show all the colors except for black and white
         i = 0
         j = 0
-        while j <= @@COLORS.length-3 do
+        while j <= @@COLORS.length - 3
             numbered_color = @@COLORS[j].gsub(' ', " #{i} ")
             @print << "  #{numbered_color}"
             if j >= 5
@@ -231,7 +238,9 @@ class MasterMind < Array
     end
 
     def add_colors_code_breaker
-        puts "Try to break the code, #{@who_is_codebreaker}. Do your best!\n\n"
+        puts ""
+        show_table
+        puts "\nTry to break the code, #{@who_is_codebreaker}. Do your best!\n\n"
         get_cell_number
         puts "\nColors you can choose from:"
         show_available_colors
@@ -285,7 +294,6 @@ class MasterMind < Array
     end
 
     def ai_strategy
-        test branch
         total_black_pegs = @peg_array[@table_line_number - 1].select { |peg| peg == "\e[100m \e[0m" }
         total_white_pegs = @peg_array[@table_line_number - 1].select { |peg| peg == "\e[107m \e[0m" }
         total_pegs = total_black_pegs.length + total_white_pegs.length
@@ -315,25 +323,92 @@ class MasterMind < Array
             end
             @blacklist_colors_ai.uniq!
             @yellowlist_colors_ai.uniq!
-            i = 0
-            while i < 4
-                if i < 2
-                    self[@table_line_number][i] = @random_colors_ai[0]
-                    @duplicate_current_table_line[i] = @random_colors_ai[0]
+            ii = 0
+            while ii < 4
+                if ii < 2
+                    self[@table_line_number][ii] = @random_colors_ai[0]
+                    @duplicate_current_table_line[ii] = @random_colors_ai[0]
                 else
-                    self[@table_line_number][i] = @random_colors_ai[1]
-                    @duplicate_current_table_line[i] = @random_colors_ai[1]
+                    self[@table_line_number][ii] = @random_colors_ai[1]
+                    @duplicate_current_table_line[ii] = @random_colors_ai[1]
                 end
-                i += 1
+                ii += 1
             end
         else
             # for each peg missing , change one color.
-            # for each white peg, change the position of one different cell
-            colors_to_be_removed = self[@table_line_number - 1].sample(4 - total_pegs)
-            colors_to_be_switched = self[@table_line_number - 1].difference(colors_to_be_removed).sample(total_white_pegs.length)
-            colors_to_be_removed.each do |color|
-                @blacklist_colors_ai << color
-                @yellowlist_colors_ai << color
+            # for each white peg, change the position of that color
+            # for each black peg, mantain that color
+            b = 0
+            idx_holder = [0, 1, 2, 3]
+            if !total_black_pegs.length.zero?
+                while b < 4
+                    if self[@table_line_number - 1][b] == @master_mind_code_table[b]
+                        self[@table_line_number][b] = self[@table_line_number - 1][b]
+                        @duplicate_current_table_line[b] = self[@table_line_number - 1][b]
+                        @excluded_idx_colors.each do |key, _value|
+                            if key != self[@table_line_number - 1][b]
+                                @excluded_idx_colors[key] << b
+                            end
+                        end
+                        idx_holder.delete(b)
+                    end
+                    b += 1
+                end
+            end
+            w = 0
+            n = 0
+            if !total_white_pegs.length.zero?
+                dup_line = self[@table_line_number - 1].dup
+                dup_code = @master_mind_code_table.dup
+                while w < 4 && n < total_white_pegs.length
+                    if dup_code.include?(dup_line[w]) && dup_line[w] != dup_code[w]
+                        color = dup_line[w]
+                        # exclude idx
+                        @excluded_idx_colors[color] << w
+                        sample_idx = idx_holder.difference(@excluded_idx_colors[color].uniq).sample
+                        self[@table_line_number][sample_idx] = color
+                        @duplicate_current_table_line[sample_idx] = color
+                        idx_holder.delete(sample_idx)
+                        temp_index = dup_code.index(dup_line[w])
+                        dup_code.delete_at(temp_index)
+                        dup_code.insert(temp_index, 0)
+                        dup_line.delete_at(w)
+                        dup_line.insert(w, 'O')
+                        n += 1
+                    end
+                    w += 1
+                end
+            end
+            missing_pegs = 4 - total_pegs
+            colors_to_be_removed = []
+            temp = 0
+            dup_line = self[@table_line_number - 1].dup
+            dup_code = @master_mind_code_table.dup
+            dup_line.each_with_index do |item, idx|
+                if dup_code.include?(item) == false
+                    colors_to_be_removed << idx
+                    temp += 1
+                elsif dup_code.include?(item) && temp < missing_pegs
+                    # check if the color must be deleted
+                    amount_of_colors_code = dup_code.select { |cell| cell == item }
+                    amount_of_colors_line = dup_line.select { |cell| cell == item }
+                    if amount_of_colors_code.length < amount_of_colors_line.length
+                        colors_to_be_removed << idx
+                        dup_line.delete_at(idx)
+                        dup_line.insert(idx, 'O')
+                        temp += 1
+                    else
+                        temp_index = dup_code.index(item)
+                        dup_code.delete_at(temp_index)
+                        dup_code.insert(temp_index, 0)
+                        dup_line.delete_at(idx)
+                        dup_line.insert(idx, 'O')
+                    end
+                end
+            end
+            colors_to_be_removed.each do |idx|
+                @blacklist_colors_ai << self[@table_line_number - 1][idx]
+                @yellowlist_colors_ai << self[@table_line_number - 1][idx]
             end
             @blacklist_colors_ai.uniq!
             @yellowlist_colors_ai.uniq!
@@ -342,45 +417,19 @@ class MasterMind < Array
             else
                 @random_colors_ai = @@COLORS_AI.difference(@blacklist_colors_ai).sample(colors_to_be_removed.length)
             end
-            i = 0
+            m = 0
             k = 0
-            j = 1
-            while i < 4
-                if colors_to_be_removed.include?(self[@table_line_number - 1][i]) && @random_colors_ai.length > k
-                    self[@table_line_number][i] = @random_colors_ai[k]
-                    @duplicate_current_table_line[i] = @random_colors_ai[k]
-                    k += 1
-                elsif colors_to_be_switched.include?(self[@table_line_number - 1][i]) && colors_to_be_switched.length >= j
-                    self[@table_line_number][i] = self[@table_line_number - 1][i]
-                    @duplicate_current_table_line[i] = self[@table_line_number - 1][i]
-                    color_register = self[@table_line_number - 1][i]
-                    if !@idx_temp_removed_colors.include?(color_register)
-                        @idx_temp_removed_colors[color_register] = []
+            if !missing_pegs.zero?
+                while m < 4
+                    if colors_to_be_removed.include?(m) && k < @random_colors_ai.length
+                        color = @random_colors_ai[k]
+                        sample_idx = idx_holder.sample
+                        self[@table_line_number][sample_idx] = color
+                        @duplicate_current_table_line[sample_idx] = color
+                        idx_holder.delete(sample_idx)
+                        k += 1
                     end
-                    if !@idx_temp_removed_colors[color_register].include?(i)
-                        @idx_temp_removed_colors[color_register] << i
-                    end
-                    j += 1
-                else
-                    self[@table_line_number][i] = self[@table_line_number - 1][i]
-                    @duplicate_current_table_line[i] = self[@table_line_number - 1][i]
-                end
-                i += 1
-            end
-            # shuffle
-            # while the two colors in color_to_be_switched have an index present in hash, shuffle
-            colors_to_be_switched.each do |color|
-                to_redo = false
-                self[@table_line_number].shuffle
-                @duplicate_current_table_line.shuffle
-                self[@table_line_number].each_with_index do |cell, idx|
-                    if cell == color && @idx_temp_removed_colors[cell].include?(idx)
-                        to_redo = true
-                    end
-                end
-                if to_redo
-                    to_redo = false
-                    redo
+                    m += 1
                 end
             end
         end
@@ -409,13 +458,21 @@ class MasterMind < Array
                 @duplicate_current_table_line.insert(idx, 0)
                 dup_code_table.delete_at(idx)
                 dup_code_table.insert(idx, 'O')
+            end
+        end
+        @duplicate_current_table_line.each_with_index do |item, idx|
             # if only color matches >> white peg
-            elsif dup_code_table.include?(item) && dup_code_table[idx] != @duplicate_current_table_line[idx]
+            if dup_code_table.include?(item) && dup_code_table[idx] != @duplicate_current_table_line[idx]
                 @peg_array[@table_line_number] << "\e[107m \e[0m"
+                @duplicate_current_table_line.delete_at(idx)
+                @duplicate_current_table_line.insert(idx, 0)
+                temp_index = dup_code_table.index(item)
+                dup_code_table.delete_at(temp_index)
+                dup_code_table.insert(temp_index, 'O')
             end
         end
         # print pegs
-        @peg_array[@table_line_number].each do |peg|
+        @peg_array[@table_line_number].shuffle!.each do |peg|
             @print << "  #{peg}"
         end
         if @print.empty?
@@ -432,9 +489,9 @@ class MasterMind < Array
             puts "\n#{"\e[92m#{@who_is_codebreaker} broke the code!\e[0m"}\n"
             # insert scores
             if @who_is_mastermind == @player_two
-                score_list[player_two] += @table_line_number
+                @score_list[@player_two] += @table_line_number
             else
-                score_list[player_one] += @table_line_number
+                @score_list[@player_one] += @table_line_number
             end
             puts "\nMasterMind Code was:"
             show_code_table
@@ -447,34 +504,50 @@ class MasterMind < Array
             self.each do |row|
                 row.replace(%w(O O O O))
             end
+            @excluded_idx_colors = {
+                "\e[41m \e[0m" => [],
+                "\e[42m \e[0m" => [],
+                "\e[43m \e[0m" => [],
+                "\e[44m \e[0m" => [],
+                "\e[45m \e[0m" => [],
+                "\e[46m \e[0m" => []
+            }
             @master_mind_code_table = %w(O O O O)
             @duplicate_current_table_line = %w(O O O O)
             puts "\nSCORES"
-            score_list.each { |key, value| puts key, value }
+            @score_list.each { |key, value| puts key, value }
             check_score
         elsif @table_line_number == 9 && !won
             puts "\n#{"\e[92m#{@who_is_mastermind}'s code was unbreakable!\e[0m"}"
             if @who_is_mastermind == @player_two
-                score_list[player_two] += 11
+                @score_list[@player_two] += 11
             else
-                score_list[player_one] += 11
+                @score_list[@player_one] += 11
             end
             puts "\nMasterMind Code was:"
             show_code_table
 
             # reset values
             @table_line_number = 0
-            peg_array.each do |row|
+            @peg_array.each do |row|
                 row.replace([])
             end
             self.each do |row|
                 row.replace(%w(O O O O))
             end
+            @excluded_idx_colors = {
+                "\e[41m \e[0m" => [],
+                "\e[42m \e[0m" => [],
+                "\e[43m \e[0m" => [],
+                "\e[44m \e[0m" => [],
+                "\e[45m \e[0m" => [],
+                "\e[46m \e[0m" => []
+            }
             @master_mind_code_table = %w(O O O O)
             @duplicate_current_table_line = %w(O O O O)
             # puts "\n#{show_table}\n#{show_code_table}"
             puts "\nSCORES"
-            score_list.each { |key, value| puts key, value }
+            @score_list.each { |key, value| puts key, value }
             check_score
         else
             @table_line_number += 1
@@ -486,7 +559,7 @@ class MasterMind < Array
                 next_round_game_input = gets.chomp
             end
             system 'clear'
-            puts "ROUND # #{@table_line_number + 1}"
+            puts "ROUND # #{@table_line_number + 1}\n"
             if @player_two == 'AI' && @player_two != @who_is_mastermind
                 ai_strategy
             else
@@ -516,7 +589,7 @@ class MasterMind < Array
     end
 
     def check_score
-        if score_list[@player_one] >= @total_score
+        if @score_list[@player_one] >= @total_score
             puts "\n\n\e[7m#{@player_one.upcase} WON THE GAME\e[0m"
             puts "\nPRESS #{"\e[5m1\e[0m"} TO PLAY ANOTHER GAME"
             next_game_input = gets.chomp
@@ -526,7 +599,7 @@ class MasterMind < Array
             end
             set_total_score
             player_choice
-        elsif score_list[@player_two] >= @total_score
+        elsif @score_list[@player_two] >= @total_score
             puts "\n\n\e[7m#{@player_two.upcase} WON THE GAME\e[0m"
             puts "\nPRESS #{"\e[5m1\e[0m"} TO PLAY ANOTHER GAME"
             next_game_input = gets.chomp
