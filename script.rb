@@ -552,6 +552,14 @@ class MasterMind < Array
         else
             @table_line_number += 1
             @duplicate_current_table_line = %w(O O O O)
+            @excluded_idx_colors = {
+                "\e[41m \e[0m" => [],
+                "\e[42m \e[0m" => [],
+                "\e[43m \e[0m" => [],
+                "\e[44m \e[0m" => [],
+                "\e[45m \e[0m" => [],
+                "\e[46m \e[0m" => []
+            }
             puts "\nPRESS #{"\e[5m1\e[0m"} FOR THE NEXT ROUND"
             next_round_game_input = gets.chomp
             until next_round_game_input == '1' do
