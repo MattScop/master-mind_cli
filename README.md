@@ -4,6 +4,8 @@
 
 # Project from TOP lesson, designed to be playable on CLI.
 
+[![Run on Repl.it](https://replit.com/badge/github/MattScop/master-mind_cli)](https://replit.com/new/github/MattScop/master-mind_cli)
+
 > RULES
 - 6 colors
 - 10 rows
